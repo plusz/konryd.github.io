@@ -176,10 +176,10 @@
     document.getElementById("narwhal").style.top = narwhaldepth.toString() + "px"
   }
 
-  document.addEventListener("keydown", (event) => {
+  function keyDown(evkey) {
     pressed = true;
     if (interval != null) {
-      if (event.key == key) {
+      if (evkey == key) {
         return;
       } else {
         speed = 0;
@@ -187,7 +187,23 @@
     } else {
       interval = setInterval(shift, 40);
     }
-    key = event.key;
+    key = evkey;
+  }
+
+  document.addEventListener("keydown", (event) => {
+    keyDown(event.key);
+  });
+
+  document.addEventListener("touchstart", (event) => {
+    if (event.targetTouches[0].pageY < 175) {
+      keyDown("ArrowUp");
+    } else {
+      keyDown("ArrowDown");
+    }
+  });
+
+  document.addEventListener("touchend", (event) => {
+    pressed = false;
   });
 
   document.addEventListener("keyup", (event) => {
