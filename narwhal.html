@@ -200,10 +200,12 @@
     } else {
       keyDown("ArrowDown");
     }
+    event.preventDefault();
   });
 
   document.addEventListener("touchend", (event) => {
     pressed = false;
+    event.preventDefault();
   });
 
   document.addEventListener("keyup", (event) => {
