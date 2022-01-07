@@ -212,6 +212,13 @@
     pressed = false;
   });
 
+  window.oncontextmenu = function(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    return false;
+  };
+
+
   setInterval(function() {
     move()
   }, 40);
