@@ -110,6 +110,9 @@
       audio.play();
       points++;
       document.getElementById("points").innerText = points;
+      speedupFactor = Math.min(Math.floor(points / 10), 5) / 5
+      animationStep = 10 + Math.floor(25 * speedupFactor);
+      speedStep = 2 + 4 * speedupFactor;
     }
 
     // display
