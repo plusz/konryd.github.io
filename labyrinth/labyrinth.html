@@ -1,0 +1,254 @@
+<html>
+<head>
+<script>
+
+gateWidth = 20
+boardWidth = 400
+
+circleDistance = 20
+baseCircle = 40
+
+centerX = 400
+centerY = 400
+
+gates = []
+walls = []
+
+function mulberry32(a) {
+    return function() {
+      var t = a += 0x6D2B79F5;
+      t = Math.imul(t ^ t >>> 15, t | 1);
+      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    }
+}
+
+//random = mulberry32(103)
+random = Math.random
+
+function biasedRandom1() {
+  return random() ** 2
+}
+function biasedRandom2() {
+  return 1 - random() ** 2
+}
+biasedRandom = biasedRandom1
+
+function randBetween(a, b) {
+  if (b < a || b < 0){
+    b = boardWidth + b
+  }
+  let res =  a + Math.ceil((biasedRandom() * (b - a)))
+  if (res > boardWidth) {
+    res = res - boardWidth
+  }
+  return res
+}
+
+function getWalls(gs) {
+  let res = []
+  for (let i = 0; i < gs.length - 1; i++) {
+    res.push(randBetween(gs[i]+gateWidth, gs[i+1]))
+  }
+  res.push(randBetween(gs[gs.length-1]+gateWidth, gs[0]))
+  return res
+}
+
+function getGates(ws) {
+  let res = []
+  for (let i = 0; i < ws.length - 1; i++) {
+    res.push(randBetween(ws[i], ws[i+1] - gateWidth))
+  }
+  res.push(randBetween(ws[ws.length-1], ws[0] - gateWidth))
+  return res
+}
+
+function initGates(size) {
+  let gs = []
+  let gaps = [[0, boardWidth + gateWidth]]
+  while (gs.length < size) {
+    // pick a gap
+    gap = gaps[Math.floor(gaps.length * random())]
+
+    // add a gate to fill it
+    gs.push((gap[0] + Math.ceil(Math.random() * (gap[1] - gap[0]))) % boardWidth)
+
+    // sort gates
+    gs.sort(function(a, b){return a - b})
+
+    // recompute gaps
+    gaps = []
+    for (let i = 0; i < gs.length - 1; i++) {
+      startGateBound = gs[i] + gateWidth
+      endGateBound = gs[i+1]
+      if ((endGateBound - startGateBound) > gateWidth) {
+        gaps.push([startGateBound, endGateBound - gateWidth])
+      }
+    }
+
+    // Special case for gap spanning around the board
+    startGateBound = gs[gs.length - 1] + gateWidth
+    endGateBound = gs[0] + boardWidth
+    if (startGateBound > boardWidth) {
+      startGateBound -= boardWidth
+      endGateBound -= boardWidth
+    }
+    if ((endGateBound - startGateBound) > gateWidth) {
+      gaps.push([startGateBound, endGateBound - gateWidth])
+    }
+
+    gaps.sort(function(a, b){return a - b})
+  }
+  return gs
+}
+
+function populateGatesAndWalls() {
+
+  gates.push(initGates(5))
+
+  for (i = 0; i < 7; i++) {
+    if (i % 3 == 0) {
+      if (biasedRandom == biasedRandom1) {
+        biasedRandom = biasedRandom2
+      } else {
+        biasedRandom = biasedRandom1
+      }
+    }
+    walls.push(getWalls(gates[gates.length - 1]))
+    gates.push(getGates(walls[walls.length - 1]))
+  }
+
+  while (gates[0].length > 1) {
+    startingWalls = getWalls(gates[0])
+    startingWalls.pop()
+    walls.unshift(startingWalls)
+
+    startingGates = getGates(walls[0])
+    startingGates.pop()
+    gates.unshift(startingGates)
+  }
+
+  gates.reverse()
+  walls.reverse()
+
+  while (gates[0].length > 1) {
+    startingWalls = getWalls(gates[0])
+    startingWalls.pop()
+    walls.unshift(startingWalls)
+
+    startingGates = getGates(walls[0])
+    startingGates.pop()
+    gates.unshift(startingGates)
+  }
+}
+
+function drawAsLines() {
+  c = document.getElementById("canvas1").getContext("2d")
+  c.lineWidth = 3
+
+  for(let i = 0; i < gates.length; i++) {
+    let gs = [...gates[i]]
+    gs.sort(function(a, b){return a - b})
+    lvl = gateWidth + i * gateWidth
+
+    c.beginPath()
+    start = 0
+    if (gs[gs.length - 1] > boardWidth - gateWidth) {
+      start = gs[gs.length - 1] + gateWidth - boardWidth
+    }
+    c.moveTo(start, lvl)
+    c.lineTo(gs[0], lvl)
+    c.stroke()
+   
+    for (let j = 0; j < gs.length - 1; j++) {
+      c.beginPath()
+      c.moveTo(gs[j] + gateWidth, lvl)
+      c.lineTo(gs[j+1], lvl)
+      c.stroke()
+    }
+
+    if (gs[gs.length-1] + gateWidth <= boardWidth) {
+      c.beginPath()
+      c.moveTo(gs[gs.length-1] + gateWidth, lvl)
+      c.lineTo(boardWidth, lvl)
+      c.stroke()
+    }
+  }
+
+  for(let i = 0; i < walls.length; i++) {
+    lvl = gateWidth + i * gateWidth
+
+    for (w of walls[i]) {
+      c.beginPath()
+      c.moveTo(w, lvl)
+      c.lineTo(w, lvl + gateWidth)
+      c.stroke()
+    }
+  }
+}
+
+function arc(c, x, y, r, s, e) {
+  c.arc(x, y, r, s, e)
+}
+  
+function radiantLine(c, centerX,centerY,innerRadius,outerRadius,radians,linewidth){
+
+    var innerX = centerX + innerRadius * Math.cos(radians);
+    var innerY = centerY + innerRadius * Math.sin(radians);
+    var outerX = centerX + outerRadius * Math.cos(radians);
+    var outerY = centerY + outerRadius * Math.sin(radians);
+
+    c.beginPath();
+    c.moveTo(innerX,innerY);
+    c.lineTo(outerX,outerY);
+    c.stroke();
+}
+
+function drawAsCircles() {
+  c = document.getElementById("canvas1").getContext("2d")
+  c.lineWidth = 3
+
+  for(let i = 0; i < gates.length; i++) {
+    let gs = [...gates[i]]
+    gs.sort(function(a, b){return a - b})
+    lvl = baseCircle + i * circleDistance
+
+    lvlGateWidth = 1000 / lvl
+
+    for (let j = 0; j < gs.length - 1; j++) {
+      c.beginPath()
+      arc(c, centerX, centerY, lvl,
+        (((gs[j] + lvlGateWidth)) / boardWidth) * 2 * Math.PI,
+        (gs[j+1] / boardWidth) * 2 * Math.PI)
+      c.stroke()
+    }
+    c.beginPath()
+    arc(c, centerX, centerY, lvl,
+      (((gs[gs.length-1] + lvlGateWidth)) / boardWidth) * 2 * Math.PI,
+      (gs[0] / boardWidth) * 2 * Math.PI)
+    c.stroke()
+  }
+
+  for (let i = 0; i < walls.length; i++) {
+    let ws = walls[i]
+    lvl = baseCircle + i * circleDistance
+
+    for (let j = 0; j < ws.length; j++) {
+      radiantLine(c, centerX, centerY, lvl, lvl + circleDistance, ((ws[j] / boardWidth) * 2 * Math.PI))
+    }
+  }
+}
+
+window.onload = function() {
+  populateGatesAndWalls()
+  //drawAsLines()
+  drawAsCircles()
+}
+
+
+</script>
+</head>
+<body>
+<canvas id="canvas1" width=800 height=800></canvas>
+</body>
+</html>
