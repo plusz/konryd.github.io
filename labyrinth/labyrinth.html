@@ -14,6 +14,7 @@ centerY = 400
 gates = []
 walls = []
 
+
 function mulberry32(a) {
     return function() {
       var t = a += 0x6D2B79F5;
@@ -191,8 +192,7 @@ function arc(c, x, y, r, s, e) {
   c.arc(x, y, r, s, e)
 }
   
-function radiantLine(c, centerX,centerY,innerRadius,outerRadius,radians,linewidth){
-
+function radiantLine(c, centerX,centerY,innerRadius,outerRadius,radians,linewidth) {
     var innerX = centerX + innerRadius * Math.cos(radians);
     var innerY = centerY + innerRadius * Math.sin(radians);
     var outerX = centerX + outerRadius * Math.cos(radians);
@@ -206,7 +206,7 @@ function radiantLine(c, centerX,centerY,innerRadius,outerRadius,radians,linewidt
 
 function drawAsCircles() {
   c = document.getElementById("canvas1").getContext("2d")
-  c.lineWidth = 3
+  c.lineWidth = 4
 
   for(let i = 0; i < gates.length; i++) {
     let gs = [...gates[i]]
@@ -239,6 +239,199 @@ function drawAsCircles() {
   }
 }
 
+
+
+
+// code below contains methods for finding labirynth solution
+function findSolution() {
+  step = 0
+  const mazeImg = prepareBackground()
+  ariadnaBall = new AriadnaBall(mazeImg)
+
+  requestAnimationFrame(function() {
+          startSearch()
+        });  
+}
+
+function startSearch() {  
+  requestAnimationFrame(function(ariadnaBall) { 
+          startSearch(ariadnaBall)
+        })
+
+        // temporary code to prevent unlimited repetition
+        if (step > 1800) {return}
+        step ++
+
+        ariadnaBall.go()
+
+}
+
+function prepareBackground() {
+  const mazeImg = new Image();
+
+  srcCanvas = document.getElementById("canvas1")
+  canvas_maze = document.getElementById("canvas_maze").getContext("2d")
+
+  mazeImg.id = "mazeImg";
+  mazeImg.onload = function() {
+    canvas_maze.drawImage(mazeImg, 0, 0)
+    };
+
+  mazeImg.src = srcCanvas.toDataURL()
+
+  return mazeImg
+}
+
+
+function AriadnaBall(mazeImg) {
+  angleToRadians = Math.PI/180  
+  this.fillColor = 'red'
+  this.ballRadius = gateWidth / 2 -2
+  this.ballStep = 1
+  this.direction = 'in'
+  this.mode = this.direction // ['in', 'out', 'rotate']
+  this.radius = 300
+  this.angle = 270
+  this.rotation = 'clockwise' // ['clockwise', 'counterclockwise']
+  this.rotationChanged = 0
+
+  this.x = centerX
+  this.y = centerY + this.radius * Math.sin(this.angle*angleToRadians)
+
+  this.go = () => {
+      // check collision      
+      this.detectWalls() 
+      this.renderBall();
+
+      if (Math.abs(this.x - 400) < 30 && Math.abs(this.y-400)<30)
+          {
+            console.log('done')
+            step = 1800
+          }
+      this.move()
+  }
+  
+  this.move = () => {
+      switch (this.mode) {
+        case 'in': 
+          this.radius -= this.ballStep
+          break
+        case 'out': 
+          this.radius += this.ballStep
+          break
+        case 'rotate':  
+          this.angle = (this.angle + ((this.rotation === 'counterclockwise') ? -1 : 1)) % 360
+          break          
+      }
+
+    this.x = Math.round(centerX + this.radius * Math.cos(this.angle*angleToRadians))
+    this.y = Math.round(centerY + this.radius * Math.sin(this.angle*angleToRadians))
+  };
+
+  this.detectWalls = () => {
+    const surroundingPixel = []
+    const radarDistance = 1
+    const angleDistance = 1
+    let xStart, yStart
+
+    // check horizontalWall
+    angleDirection = this.rotation === 'clockwise' ? 1 : -1
+    xStart = Math.round(this.x + this.ballRadius * Math.cos((this.angle+90*angleDirection)*angleToRadians))
+    yStart = Math.round(this.y + this.ballRadius * Math.sin((this.angle+90*angleDirection)*angleToRadians))
+
+    xDist = angleDirection
+    yDist = angleDirection
+
+    // check horizontal
+    horizontalWallPixels = canvas_maze.getImageData(xStart, yStart, 1, 1)
+    hasHorizontalWall = this.checkIfNotWhite(horizontalWallPixels.data)
+    this.radarHorizontX = xStart
+    this.radarHorizontY = yStart 
+    
+    if (hasHorizontalWall && this.mode === 'rotate') {
+      console.log("hasHorizontalWall" + this.x + ' ' + this.y + ' xS: ' + xStart + ' yS: ' + yStart + ' xD: ' + xDist + ' yD: ' + yDist +' radius: ' + this.radius)
+      console.log(horizontalWallPixels.data)
+      this.rotation = this.rotation === 'clockwise' ? 'counterclockwise' : 'clockwise'    
+      this.rotationChanged += 1 
+      if (this.rotationChanged === 2) {
+        this.rotationChanged = 0
+        this.direction = 'out'
+      }
+      return
+    }     
+    
+    // check gap or wall
+    xDist = radarDistance * angleDirection
+    yDist = radarDistance * angleDirection
+    radiusDirection = this.direction === 'in' ? -1 : 1
+    xStart = Math.round(centerX + (this.radius + radiusDirection*this.ballRadius) * Math.cos(this.angle*angleToRadians))
+    yStart = Math.round(centerY + (this.radius + radiusDirection*this.ballRadius) * Math.sin(this.angle*angleToRadians))       
+    arcWallPixels = canvas_maze.getImageData(xStart, yStart, xDist, yDist)
+    hasGap = this.checkIfWhite(arcWallPixels.data)
+    this.radarGapX = xStart
+    this.radarGapY = yStart 
+
+    if (hasGap) {
+      this.mode = this.direction
+      this.rotationChanged = 0
+      return 
+    }  
+  
+    this.mode = 'rotate'    
+  }
+
+  this.renderBall = () => {   
+    // clear and render background
+    canvas_maze.fillStyle = '#ffffff'
+    canvas_maze.fillRect(0, 0, 800, 800)
+    canvas_maze.drawImage(mazeImg, 0, 0)
+
+    // render ball
+    canvas_maze.beginPath()
+    canvas_maze.arc(this.x, this.y, this.ballRadius - 2, 0, 2 * Math.PI, false)
+    canvas_maze.fillStyle = this.fillColor
+    canvas_maze.fill()    
+
+
+/*
+    canvas_maze.beginPath()
+    canvas_maze.arc(this.radarHorizontX-1, this.radarHorizontY-1, this.ballRadius/4, 0, 2 * Math.PI, false)
+    canvas_maze.fillStyle = 'blue'
+    canvas_maze.fill()    
+
+    canvas_maze.beginPath()
+    canvas_maze.arc(this.radarGapX, this.radarGapY, this.ballRadius/4, 0, 2 * Math.PI, false)
+    canvas_maze.fillStyle = 'green'
+    canvas_maze.fill()        
+ */
+
+  }   
+
+  this.checkIfWhite = (pixels) => {
+    isWhite = pixels.reduce((partialSum, a) => partialSum + a, 0) / pixels.length === 255
+    //isRedOrWhite = pixels.reduce((partialSum, a) => partialSum + a, 0) % 255 === 0
+    return isWhite
+  }  
+
+  this.checkIfNotWhite = (pixels) => {
+    isWhite = pixels.reduce((partialSum, a) => partialSum + a, 0) / pixels.length === 255
+    isRedOrWhite = pixels.reduce((partialSum, a) => partialSum + a, 0) % 255 === 0
+    isBlue = pixels.reduce((partialSum, a) => partialSum + a, 0) === (48+48+255+255)
+    isLBlue = pixels.reduce((partialSum, a) => partialSum + a, 0) === (21+31+255+255)
+    isLRed = pixels.reduce((partialSum, a) => partialSum + a, 0) === (175+175+255+255)
+    return !isWhite && !isRedOrWhite && !isBlue && !isLBlue && !isLRed
+  }    
+  this.checkIfBlack = (pixels) => {
+    isWhite = pixels.reduce((partialSum, a) => partialSum + a, 0) / pixels.length === 255
+    isRedOrWhite = pixels.reduce((partialSum, a) => partialSum + a, 0) % 255 === 0
+    return !isWhite && !isRedOrWhite
+  } 
+
+}
+
+
+
+
 window.onload = function() {
   populateGatesAndWalls()
   //drawAsLines()
@@ -246,9 +439,16 @@ window.onload = function() {
 }
 
 
+
 </script>
 </head>
 <body>
-<canvas id="canvas1" width=800 height=800></canvas>
+  <div>
+<input type="button" onClick="findSolution()" value="I'm too lazy ... "/>
+</div>
+<div>
+  <canvas id="canvas1" width=800 height=800></canvas>
+  <canvas id="canvas_maze" width=800 height=800></canvas>
+</div>
 </body>
 </html>
