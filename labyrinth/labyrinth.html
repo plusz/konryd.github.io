@@ -474,23 +474,69 @@ function MagicBall(mazeImg) {
 
 
 
+function hookUpScribbling() {
+  canvas = document.getElementById("canvas1")
+  c = canvas.getContext("2d")
+
+  var isDrawing = false
+  var lastX = 0
+  var lastY = 0
+
+  function getDirectlyOrFromFirstChangedTouch(event, key) {
+    return event[key] === undefined ? event.changedTouches[0][key] : event[key]
+  }
+
+  function startDrawing(event) {
+    lastX = getDirectlyOrFromFirstChangedTouch(event, "clientX")
+    lastY = getDirectlyOrFromFirstChangedTouch(event, "clientY")
+    isDrawing = true
+  }
+
+  function stopDrawing(event) {
+    isDrawing = false
+  }
+
+  function handleMove(event) {
+    if (isDrawing) {
+      x = getDirectlyOrFromFirstChangedTouch(event, "clientX")
+      y = getDirectlyOrFromFirstChangedTouch(event, "clientY")
+      c.lineWidth = 2
+      c.beginPath()
+      c.moveTo(lastX, lastY)
+      c.lineTo(x, y)
+      c.strokeStyle = '#ff0000'
+      c.stroke()
+      lastX = x
+      lastY = y
+    }
+  }
+
+  canvas.addEventListener('mousedown', startDrawing)
+  canvas.addEventListener('mouseup', stopDrawing)
+  canvas.addEventListener('mousemove', handleMove)
+  canvas.addEventListener('touchstart', startDrawing)
+  canvas.addEventListener('touchend', stopDrawing)
+  canvas.addEventListener('touchmove', handleMove)
+}
+
 window.onload = function() {
   populateGatesAndWalls()
   //drawAsLines()
   drawAsCircles()
+  hookUpScribbling()
 }
 
 
 
 </script>
 </head>
-<body>
+<body style="overflow: hidden;">
   <div>
-<input type="button" onClick="findSolution()" value="I'm too lazy ... "/>
-</div>
-<div>
-  <canvas id="canvas1" width=800 height=800></canvas>
-  <canvas id="canvas_maze" width=800 height=800></canvas>
-</div>
+    <input type="button" onClick="findSolution()" value="I'm too lazy ... "/>
+  </div>
+  <div>
+    <canvas id="canvas1" width=800 height=800></canvas>
+    <canvas id="canvas_maze" width=800 height=800></canvas>
+  </div>
 </body>
 </html>
