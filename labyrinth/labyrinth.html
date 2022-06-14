@@ -14,6 +14,7 @@ centerY = 400
 gates = []
 walls = []
 
+animate = ''
 
 function mulberry32(a) {
     return function() {
@@ -248,7 +249,7 @@ function findSolution() {
   const mazeImg = prepareBackground()
   ariadnaBall = new AriadnaBall(mazeImg)
 
-  requestAnimationFrame(function() {
+  animate = requestAnimationFrame(function() {
           startSearch()
         });  
 }
@@ -259,7 +260,10 @@ function startSearch() {
         })
 
         // temporary code to prevent unlimited repetition
-        if (step > 1800) {return}
+        if (step > 15000) {
+          cancelAnimationFrame(animate)
+          return
+          }
         step ++
 
         ariadnaBall.go()
@@ -294,6 +298,9 @@ function AriadnaBall(mazeImg) {
   this.angle = 270
   this.rotation = 'clockwise' // ['clockwise', 'counterclockwise']
   this.rotationChanged = 0
+  this.displayHorizontRadar = false
+  this.displayGapRadar = false
+  this.visitedGaps = []
 
   this.x = centerX
   this.y = centerY + this.radius * Math.sin(this.angle*angleToRadians)
@@ -303,10 +310,12 @@ function AriadnaBall(mazeImg) {
       this.detectWalls() 
       this.renderBall();
 
-      if (Math.abs(this.x - 400) < 30 && Math.abs(this.y-400)<30)
+      if ((Math.abs(this.x - 400) < 30 && Math.abs(this.y-400) < 30)
+      || this.y<30 || this.y>750 || this.x<30 || this.x>750)
           {
             console.log('done')
-            step = 1800
+            step = 15000
+            cancelAnimationFrame(animate)
           }
       this.move()
   }
@@ -321,6 +330,9 @@ function AriadnaBall(mazeImg) {
           break
         case 'rotate':  
           this.angle = (this.angle + ((this.rotation === 'counterclockwise') ? -1 : 1)) % 360
+          if (this.angle < 0) {
+            this.angle = 360 - this.angle
+          }          
           break          
       }
 
@@ -355,7 +367,7 @@ function AriadnaBall(mazeImg) {
       this.rotationChanged += 1 
       if (this.rotationChanged === 2) {
         this.rotationChanged = 0
-        this.direction = 'out'
+        this.direction = this.direction === 'in' ? 'out':'in'
       }
       return
     }     
@@ -371,13 +383,30 @@ function AriadnaBall(mazeImg) {
     this.radarGapX = xStart
     this.radarGapY = yStart 
 
-    if (hasGap) {
+
+    isGapVisited = this.isVisitedGap(this.radius, this.angle)
+
+    if (hasGap & !isGapVisited) {
+      // we save gap data only if more that 'gateWidth' from previous gap
+      if (this.mode === 'rotate') {
+        let gap = {x: this.x, y: this.y, angle: this.angle, radius: this.radius, direction: this.direction}
+        this.visitedGaps.push(gap)
+        console.log('gap:' + ' x: '+this.x+' y:'+this.y+' angle:'+this.angle+' radius:'+this.radius+' direction:'+this.direction)
+      }
+      
       this.mode = this.direction
       this.rotationChanged = 0
       return 
     }  
   
     this.mode = 'rotate'    
+  }
+
+  // this method needs to be optiomized, to not analyze all gaps
+  this.isVisitedGap = () => {
+    return this.visitedGaps.filter(element => element.direction !== this.direction).some(element => {      
+      return Math.abs(element.radius - this.radius) < 5 && Math.abs(element.angle - this.angle) < 15
+    })
   }
 
   this.renderBall = () => {   
@@ -388,22 +417,23 @@ function AriadnaBall(mazeImg) {
 
     // render ball
     canvas_maze.beginPath()
-    canvas_maze.arc(this.x, this.y, this.ballRadius - 2, 0, 2 * Math.PI, false)
+    canvas_maze.arc(this.x, this.y, this.ballRadius - 3, 0, 2 * Math.PI, false)
     canvas_maze.fillStyle = this.fillColor
     canvas_maze.fill()    
 
 
-/*
+if (this.displayHorizontRadar) {
     canvas_maze.beginPath()
-    canvas_maze.arc(this.radarHorizontX-1, this.radarHorizontY-1, this.ballRadius/4, 0, 2 * Math.PI, false)
+    canvas_maze.arc(this.radarHorizontX, this.radarHorizontY, this.ballRadius/4, 0, 2 * Math.PI, false)
     canvas_maze.fillStyle = 'blue'
     canvas_maze.fill()    
-
+}
+if (this.displayGapRadar) {
     canvas_maze.beginPath()
     canvas_maze.arc(this.radarGapX, this.radarGapY, this.ballRadius/4, 0, 2 * Math.PI, false)
     canvas_maze.fillStyle = 'green'
     canvas_maze.fill()        
- */
+  }
 
   }   
 
@@ -415,11 +445,8 @@ function AriadnaBall(mazeImg) {
 
   this.checkIfNotWhite = (pixels) => {
     isWhite = pixels.reduce((partialSum, a) => partialSum + a, 0) / pixels.length === 255
-    isRedOrWhite = pixels.reduce((partialSum, a) => partialSum + a, 0) % 255 === 0
-    isBlue = pixels.reduce((partialSum, a) => partialSum + a, 0) === (48+48+255+255)
-    isLBlue = pixels.reduce((partialSum, a) => partialSum + a, 0) === (21+31+255+255)
-    isLRed = pixels.reduce((partialSum, a) => partialSum + a, 0) === (175+175+255+255)
-    return !isWhite && !isRedOrWhite && !isBlue && !isLBlue && !isLRed
+    //isRedOrWhite = pixels.reduce((partialSum, a) => partialSum + a, 0) % 255 === 0
+    return !isWhite
   }    
   this.checkIfBlack = (pixels) => {
     isWhite = pixels.reduce((partialSum, a) => partialSum + a, 0) / pixels.length === 255
